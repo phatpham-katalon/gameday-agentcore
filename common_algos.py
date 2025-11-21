@@ -7,6 +7,12 @@ Shared cipher tools used across multiple agents
 """
 
 from strands import tool
+import string
+
+_ATBASH_TABLE = str.maketrans(
+    string.ascii_uppercase + string.ascii_lowercase,
+    string.ascii_uppercase[::-1] + string.ascii_lowercase[::-1],
+)
 
 
 # Basic Substitution Ciphers
