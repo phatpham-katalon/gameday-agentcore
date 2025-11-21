@@ -52,6 +52,9 @@ Before deployment, examine these classified files:
 ## 📚 CLASSIFIED DOCUMENTATION
 - [Cipher Techniques Guide](CIPHER_TECHNIQUES.md) - Known Evil Llama encryption methods
 
+## 🛡️ AGENTCORE TROUBLESHOOTING
+- [AgentCore Deployment Troubleshooting](AGENTCORE_TROUBLESHOOTING.md) explains how to diagnose and fix the “Runtime initialization time exceeded (60s)” error on Bedrock AgentCore.
+
 ## 🆘 MISSION SUPPORT
 
 If you encounter issues during the operation:

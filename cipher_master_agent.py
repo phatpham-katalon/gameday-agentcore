@@ -44,11 +44,10 @@ def multi_layer_decoder(encrypted_text: str) -> str:
         
         Always return your answer in the format: "DECRYPTED: [result]" and show the steps taken.
         """
-        # TODO I don't know if we want to use the actual algorithms as tools, worth a shot?  maybe?
         multi_layer_agent = Agent(
             system_prompt=MULTI_LAYER_AGENT_PROMPT,
             model=model,
-            tools=[TODO]
+            tools=[atbash_cipher, caesar_cipher]
         )
         response = multi_layer_agent(f"Decode this multi-layer encrypted text: {encrypted_text}")
         return str(response)
@@ -98,7 +97,7 @@ def cipher_type_identifier(encrypted_text: str) -> str:
         cipher_id_agent = Agent(
             system_prompt=CIPHER_ID_AGENT_PROMPT,
             model=model,
-            tools=[TODO]
+            tools=[]
         )
         response = cipher_id_agent(f"Identify the cipher type for this encrypted text: {encrypted_text}")
         return str(response)

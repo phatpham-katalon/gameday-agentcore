@@ -6,6 +6,12 @@ Cipher Command Agent - Multi-Agent Orchestration
 Main orchestration agent that coordinates all specialist cipher-breaking agents
 """
 
+import asyncio
+import logging
+import os
+from threading import Lock
+from typing import Dict, Any, Optional, Tuple
+
 from strands import Agent
 from strands.multiagent import Swarm
 from strands_tools import current_time
@@ -13,7 +19,6 @@ from strands.models import BedrockModel
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from botocore.config import Config as BotocoreConfig
 import boto3
-from typing import Dict, Any
 
 # Import specialist agent tools
 from cipher_rookie_agent import caesar_cipher_decoder, atbash_cipher_decoder, simple_substitution_decoder
@@ -21,69 +26,79 @@ from pattern_detective_agent import morse_code_decoder, rail_fence_decoder, poly
 from steganography_hunter_agent import acrostic_detector, numeric_encoding_decoder
 from cipher_master_agent import multi_layer_decoder, cipher_type_identifier
 
-# Get current AWS region
-session = boto3.Session()
-region = session.region_name
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-# Configure boto client with proper retry and timeout settings for Strands
-boto_config = BotocoreConfig(
-    retries={"max_attempts": 3, "mode": "standard"},
-    connect_timeout=15, 
-    read_timeout=360
-)
+_SWARM_LOCK = Lock()
+_swarm: Optional[Swarm] = None
+_cipher_agents: Optional[Dict[str, Agent]] = None
 
-# Initialize Bedrock model with Strands optimizations
-model = BedrockModel(
-    model_id="us.amazon.nova-pro-v1:0",
-    boto_client_config=boto_config,
-    # Add any Strands-specific model configurations here
-    region_name=region
-)
 
-# Create individual specialized agents like Rainbow Vibe pattern
+def _determine_region() -> str:
+    """Best-effort region resolution with safe fallbacks."""
+    session = boto3.Session()
+    region = session.region_name
+    if region:
+        return region
+    return os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
 
-# Cipher Rookie Agent - Basic substitution ciphers
-cipher_rookie = Agent(
-    name="cipher_rookie",
-    model=model,
-    tools=[TODO: pick your tools!DO],
-    system_prompt="""You are Cipher Rookie, specializing in basic substitution ciphers (Caesar, Atbash, simple substitution).
+
+def _build_boto_config() -> BotocoreConfig:
+    return BotocoreConfig(
+        retries={"max_attempts": 3, "mode": "standard"},
+        connect_timeout=15,
+        read_timeout=360,
+    )
+
+
+def _create_model(region: str) -> BedrockModel:
+    return BedrockModel(
+        model_id="us.amazon.nova-pro-v1:0",
+        boto_client_config=_build_boto_config(),
+        region_name=region,
+    )
+
+
+def _create_agents(model: BedrockModel) -> Dict[str, Agent]:
+    """Instantiate all specialized agents for the swarm."""
+    cipher_rookie = Agent(
+        name="cipher_rookie",
+        model=model,
+        tools=[caesar_cipher_decoder, atbash_cipher_decoder, simple_substitution_decoder, cipher_type_identifier],
+        system_prompt="""You are Cipher Rookie, specializing in basic substitution ciphers (Caesar, Atbash, simple substitution).
 
 Use cipher_type_identifier first, then the appropriate decoder tool.
 Return: "DECRYPTED: [message]"
-If it's not your cipher type, hand off to the appropriate specialist."""
-)
+If it's not your cipher type, hand off to the appropriate specialist.""",
+    )
 
-# Pattern Detective Agent - Pattern-based ciphers
-pattern_detective = Agent(
-    name="pattern_detective", 
-    model=model,
-    tools=[TODO: pick your tools!],
-    system_prompt="""You are Pattern Detective, specializing in pattern-based ciphers (Morse code, Rail Fence, Polybius square).
+    pattern_detective = Agent(
+        name="pattern_detective",
+        model=model,
+        tools=[morse_code_decoder, rail_fence_decoder, polybius_square_decoder, cipher_type_identifier],
+        system_prompt="""You are Pattern Detective, specializing in pattern-based ciphers (Morse code, Rail Fence, Polybius square).
 
 Use cipher_type_identifier first, then the appropriate decoder tool.
 Return: "DECRYPTED: [message]"
-If it's not your cipher type, hand off to the appropriate specialist."""
-)
+If it's not your cipher type, hand off to the appropriate specialist.""",
+    )
 
-# Steganography Hunter Agent - Hidden message detection
-steganography_hunter = Agent(
-    name="steganography_hunter",
-    model=model, 
-    tools=[TODO: pick your tools!],
-    system_prompt="""You are Steganography Hunter, specializing in hidden message detection (acrostic messages, numeric encoding).
+    steganography_hunter = Agent(
+        name="steganography_hunter",
+        model=model,
+        tools=[acrostic_detector, numeric_encoding_decoder, cipher_type_identifier],
+        system_prompt="""You are Steganography Hunter, specializing in hidden message detection (acrostic messages, numeric encoding).
 
 Use cipher_type_identifier first to check for hidden messages, then use appropriate detector.
 Return: "DECODED: [message]" or "NO HIDDEN MESSAGE DETECTED"
-If it's a regular cipher, hand off to the appropriate specialist."""
-)
+If it's a regular cipher, hand off to the appropriate specialist.""",
+    )
 
-# Cipher Master Agent - Advanced and multi-layer ciphers
-cipher_master = Agent(
-    name="cipher_master",
-    model=model,
-    tools=[TODO: pick your tools!],
-    system_prompt="""You are Cipher Master, the entry point for all cipher challenges. Use cipher_type_identifier first to analyze the cipher type.
+    cipher_master = Agent(
+        name="cipher_master",
+        model=model,
+        tools=[multi_layer_decoder, cipher_type_identifier],
+        system_prompt="""You are Cipher Master, the entry point for all cipher challenges. Use cipher_type_identifier first to analyze the cipher type.
 
 Based on identification, either:
 - Handle advanced/multi-layer ciphers yourself using multi_layer_decoder
@@ -98,51 +113,65 @@ IMPORTANT ROUTING RULES:
 - Dots and dashes → pattern_detective (Morse code)
 - Mixed letters → cipher_rookie (substitution ciphers)
 
-Return: "DECRYPTED: [message]" or hand off to the right specialist."""
-)
+Return: "DECRYPTED: [message]" or hand off to the right specialist.""",
+    )
 
-# Intelligence Analyst Agent - Message analysis and correlation
-intelligence_analyst = Agent(
-    name="intelligence_analyst",
-    model=model,
-    tools=[TODO: pick your tools!],
-    system_prompt="""You are Intelligence Analyst, specializing in message analysis and threat assessment.
+    intelligence_analyst = Agent(
+        name="intelligence_analyst",
+        model=model,
+        tools=[cipher_type_identifier],
+        system_prompt="""You are Intelligence Analyst, specializing in message analysis and threat assessment.
 
 Use your tools for analysis: keyword_extractor, message_correlator, threat_assessor.
 If data appears encrypted, use cipher_type_identifier then hand off to appropriate cipher agent.
-Return complete analysis results from your tools."""
-)
+Return complete analysis results from your tools.""",
+    )
 
-# Create the swarm with proper configuration (list format with entry_point)
-swarm = Swarm(
-    [TODO Pick your Agents!],
-    entry_point=cipher_master,  # Start with cipher_master for better cipher identification
-    max_handoffs=5,           # Reduced - should succeed quickly
-    max_iterations=5,         # Reduced - prevent excessive loops
-    execution_timeout=180.0,  # 3 minutes - longer timeout for complex ciphers
-    node_timeout=60.0,        # 60 seconds per agent - more time for tool execution
-    repetitive_handoff_detection_window=3,
-    repetitive_handoff_min_unique_agents=2
-)
-
-# Using Strands multi-agent swarm architecture like Rainbow Vibe
-# Each agent specializes in specific cipher types for better coordination
-
-# Export swarm for external testing (used by validation scripts)
-def get_cipher_swarm():
-    """Get the configured cipher swarm for external testing"""
-    return swarm
-
-# Export individual agents for testing
-def get_cipher_agents():
-    """Get all cipher agents for individual testing"""
     return {
         "cipher_rookie": cipher_rookie,
-        "pattern_detective": pattern_detective, 
+        "pattern_detective": pattern_detective,
         "steganography_hunter": steganography_hunter,
         "cipher_master": cipher_master,
-        "intelligence_analyst": intelligence_analyst
+        "intelligence_analyst": intelligence_analyst,
     }
+
+
+def _create_swarm() -> Tuple[Swarm, Dict[str, Agent]]:
+    agents = _create_agents(_create_model(_determine_region()))
+    swarm_instance = Swarm(
+        list(agents.values()),
+        entry_point=agents["cipher_master"],
+        max_handoffs=5,
+        max_iterations=5,
+        execution_timeout=180.0,
+        node_timeout=60.0,
+        repetitive_handoff_detection_window=3,
+        repetitive_handoff_min_unique_agents=2,
+    )
+    return swarm_instance, agents
+
+
+def _ensure_swarm_initialized() -> Swarm:
+    """Lazy-load the swarm so container startup stays fast."""
+    global _swarm, _cipher_agents
+    if _swarm is None:
+        with _SWARM_LOCK:
+            if _swarm is None:
+                logger.info("Initializing cipher swarm for the first time")
+                _swarm, _cipher_agents = _create_swarm()
+    return _swarm
+
+# Export swarm for external testing (used by validation scripts)
+def get_cipher_swarm() -> Swarm:
+    """Get the configured cipher swarm for external testing"""
+    return _ensure_swarm_initialized()
+
+
+# Export individual agents for testing
+def get_cipher_agents() -> Dict[str, Agent]:
+    """Get all cipher agents for individual testing"""
+    _ensure_swarm_initialized()
+    return dict(_cipher_agents or {})
 
 
 
@@ -151,15 +180,16 @@ def validate_swarm_functionality():
     """Validate swarm functionality for deployment validation"""
     
     try:
+        swarm_instance = get_cipher_swarm()
         # Test that swarm can be created and configured
-        if not swarm or not swarm.agents:
+        if not swarm_instance or not swarm_instance.agents:
             return False, "Swarm not properly initialized"
         
-        if len(swarm.agents) != 5:
-            return False, f"Expected 5 agents, found {len(swarm.agents)}"
+        if len(swarm_instance.agents) != 5:
+            return False, f"Expected 5 agents, found {len(swarm_instance.agents)}"
         
         # Test that all agents have proper tools
-        agent_names = [agent.name for agent in swarm.agents]
+        agent_names = [agent.name for agent in swarm_instance.agents]
         expected_agents = ["cipher_rookie", "pattern_detective", "steganography_hunter", "cipher_master", "intelligence_analyst"]
         
         for expected_agent in expected_agents:
@@ -174,8 +204,19 @@ def validate_swarm_functionality():
 # Initialize BedrockAgentCoreApp with Strands integration
 app = BedrockAgentCoreApp()
 
+
+async def _heartbeat_loop(context, interval_seconds: int = 30):
+    """Continuously ping AgentCore so long operations stay alive."""
+    while True:
+        try:
+            await context.ping(status="HEALTHY_BUSY")
+        except Exception as exc:
+            logger.debug("Heartbeat ping failed: %s", exc)
+        await asyncio.sleep(interval_seconds)
+
+
 @app.entrypoint
-async def strands_agent_bedrock(payload: Dict[str, Any]) -> str:
+async def strands_agent_bedrock(payload: Dict[str, Any], context: Optional[Any] = None) -> str:
     """
     Simple cipher command agent entrypoint - let the swarm handle routing and complexity
     """
@@ -184,9 +225,14 @@ async def strands_agent_bedrock(payload: Dict[str, Any]) -> str:
     if not user_input:
         return "Error: No prompt provided. Please provide encrypted text or cryptographic challenge."
     
+    swarm_instance = get_cipher_swarm()
+    ping_task = None
+    if context and hasattr(context, "ping"):
+        ping_task = asyncio.create_task(_heartbeat_loop(context))
+    
     try:
         # Let the swarm handle all routing and agent coordination
-        response = await swarm.invoke_async(user_input)
+        response = await swarm_instance.invoke_async(user_input)
         
         # Extract just the text content from the response
         if hasattr(response, 'results') and response.results:
@@ -210,6 +256,13 @@ async def strands_agent_bedrock(payload: Dict[str, Any]) -> str:
         
     except Exception as e:
         return f"Error processing cipher: {str(e)}"
+    finally:
+        if ping_task:
+            ping_task.cancel()
+            try:
+                await ping_task
+            except asyncio.CancelledError:
+                pass
 
 if __name__ == "__main__":
     # Run app for AgentCore deployment
