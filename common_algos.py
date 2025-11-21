@@ -13,16 +13,30 @@ from strands import tool
 @tool
 def atbash_cipher(text: str) -> str:
     """Apply Atbash cipher (A↔Z, B↔Y, C↔X, etc.)"""
-    # Todo, if you want it
     result = ""
+    for char in text:
+        if char.isalpha():
+            if char.isupper():
+                result += chr(90 - (ord(char) - 65))
+            else:
+                result += chr(122 - (ord(char) - 97))
+        else:
+            result += char
     return result
 
 
 @tool
 def caesar_cipher(text: str, shift: int) -> str:
     """Apply Caesar cipher with given shift"""
-    # Todo, if you need it
     result = ""
+    for char in text:
+        if char.isalpha():
+            if char.isupper():
+                result += chr((ord(char) - 65 + shift) % 26 + 65)
+            else:
+                result += chr((ord(char) - 97 + shift) % 26 + 97)
+        else:
+            result += char
     return result
 
 
@@ -95,8 +109,16 @@ def a1z26_encode(text: str) -> str:
 @tool
 def a1z26_decode(numbers: str) -> str:
     """Decode A1Z26 numbers to text"""
-    # Todo, if you need it
     result = ""
+    # Split by spaces and convert each number to a letter
+    num_list = numbers.strip().split()
+    for num_str in num_list:
+        try:
+            num = int(num_str)
+            if 1 <= num <= 26:
+                result += chr(64 + num)  # A=65, so 64+1=65
+        except ValueError:
+            continue
     return result
 
 
