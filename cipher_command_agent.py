@@ -46,7 +46,7 @@ model = BedrockModel(
 cipher_rookie = Agent(
     name="cipher_rookie",
     model=model,
-    tools=[TODO: pick your tools!DO],
+    tools=[caesar_cipher_decoder, atbash_cipher_decoder, simple_substitution_decoder, cipher_type_identifier],
     system_prompt="""You are Cipher Rookie, specializing in basic substitution ciphers (Caesar, Atbash, simple substitution).
 
 Use cipher_type_identifier first, then the appropriate decoder tool.
@@ -58,7 +58,7 @@ If it's not your cipher type, hand off to the appropriate specialist."""
 pattern_detective = Agent(
     name="pattern_detective", 
     model=model,
-    tools=[TODO: pick your tools!],
+    tools=[morse_code_decoder, rail_fence_decoder, polybius_square_decoder, cipher_type_identifier],
     system_prompt="""You are Pattern Detective, specializing in pattern-based ciphers (Morse code, Rail Fence, Polybius square).
 
 Use cipher_type_identifier first, then the appropriate decoder tool.
@@ -70,7 +70,7 @@ If it's not your cipher type, hand off to the appropriate specialist."""
 steganography_hunter = Agent(
     name="steganography_hunter",
     model=model, 
-    tools=[TODO: pick your tools!],
+    tools=[acrostic_detector, numeric_encoding_decoder, cipher_type_identifier],
     system_prompt="""You are Steganography Hunter, specializing in hidden message detection (acrostic messages, numeric encoding).
 
 Use cipher_type_identifier first to check for hidden messages, then use appropriate detector.
@@ -82,7 +82,7 @@ If it's a regular cipher, hand off to the appropriate specialist."""
 cipher_master = Agent(
     name="cipher_master",
     model=model,
-    tools=[TODO: pick your tools!],
+    tools=[multi_layer_decoder, cipher_type_identifier],
     system_prompt="""You are Cipher Master, the entry point for all cipher challenges. Use cipher_type_identifier first to analyze the cipher type.
 
 Based on identification, either:
@@ -105,7 +105,7 @@ Return: "DECRYPTED: [message]" or hand off to the right specialist."""
 intelligence_analyst = Agent(
     name="intelligence_analyst",
     model=model,
-    tools=[TODO: pick your tools!],
+    tools=[cipher_type_identifier],
     system_prompt="""You are Intelligence Analyst, specializing in message analysis and threat assessment.
 
 Use your tools for analysis: keyword_extractor, message_correlator, threat_assessor.
@@ -115,7 +115,7 @@ Return complete analysis results from your tools."""
 
 # Create the swarm with proper configuration (list format with entry_point)
 swarm = Swarm(
-    [TODO Pick your Agents!],
+    [cipher_rookie, pattern_detective, steganography_hunter, cipher_master, intelligence_analyst],
     entry_point=cipher_master,  # Start with cipher_master for better cipher identification
     max_handoffs=5,           # Reduced - should succeed quickly
     max_iterations=5,         # Reduced - prevent excessive loops

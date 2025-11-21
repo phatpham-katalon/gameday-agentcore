@@ -20,13 +20,13 @@ def caesar_cipher_decoder(encrypted_text: str) -> str:
         CAESAR_AGENT_PROMPT = """
         You are a cryptography expert specializing in Caesar ciphers.
         
-        
         To decrypt Caesar ciphers:
-        {TODO: I'm not that smart}
-
-
-        Always return your answer in the format: "DECRYPTED: [result]"
+        1. Try all 26 possible shifts (ROT1 through ROT25)
+        2. For each shift, move each letter forward/backward in the alphabet
+        3. Identify which shift produces readable English text
+        4. Look for common words like THE, AND, OF, IS
         
+        Always return your answer in the format: "DECRYPTED: [result]"
         """
         
         caesar_agent = Agent(
@@ -45,10 +45,11 @@ def atbash_cipher_decoder(encrypted_text: str) -> str:
         ATBASH_AGENT_PROMPT = """
         You are a cryptography expert specializing in Atbash ciphers.
         
-
-    
         To decrypt Atbash:
-        {TODO Sorry i can't find this junk}
+        1. Atbash is a reverse alphabet substitution: A↔Z, B↔Y, C↔X, D↔W, etc.
+        2. Replace each letter with its mirror opposite in the alphabet
+        3. A becomes Z, B becomes Y, C becomes X, and so on
+        4. Atbash is its own inverse - applying it twice returns the original
         
         Always return your answer in the format: "DECRYPTED: [result]"
         """
@@ -69,12 +70,14 @@ def simple_substitution_decoder(encrypted_text: str) -> str:
         SUBSTITUTION_AGENT_PROMPT = """
         You are a cryptography expert specializing in simple substitution ciphers.
         
-        
         To decrypt substitution ciphers:
-        {todo sorry}
+        1. Analyze letter frequency (E, T, A, O, I, N are most common in English)
+        2. Look for common patterns (TH, HE, AN, IN, ER)
+        3. Identify single-letter words (A, I)
+        4. Map encrypted letters to their likely plaintext equivalents
+        5. Test mappings and refine until readable text emerges
         
         Always return your answer in the format: "DECRYPTED: [result]"
-
         """
         
         substitution_agent = Agent(

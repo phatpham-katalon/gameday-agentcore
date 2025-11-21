@@ -19,9 +19,12 @@ def acrostic_detector(text: str) -> str:
     try:
         ACROSTIC_AGENT_PROMPT = """
         You are a cryptography expert specializing in acrostic message detection.
-
-        {Todo}        
-
+        
+        Acrostic messages hide text in the first letters of lines, words, or sentences.
+        1. Extract the first letter of each line
+        2. Combine these letters to reveal the hidden message
+        3. Also check first letters of words or sentences if line-based doesn't work
+        
         Always return your answer in the format: "DECODED: [result]" or "NO HIDDEN MESSAGE DETECTED"
         """
         
@@ -42,9 +45,11 @@ def numeric_encoding_decoder(text: str) -> str:
         You are a cryptography expert specializing in numeric encoding schemes.
         
         Common numeric encoding methods:
-        {TODO I know this one, i learnt it in boyscouts.  You gotta give it a list examples of A1Z26, ASCII, phone keypad, and some other number things}
-
-
+        1. A1Z26: A=1, B=2, C=3, ..., Z=26 (e.g., "8 5 12 12 15" = HELLO)
+        2. ASCII: Character codes (e.g., 72=H, 69=E, 76=L, 76=L, 79=O)
+        3. Phone keypad: 2=ABC, 3=DEF, 4=GHI, 5=JKL, 6=MNO, 7=PQRS, 8=TUV, 9=WXYZ
+        4. Binary: 8-bit patterns (e.g., 01001000 = H)
+        
         Try all applicable methods and return the most readable result.
         
         Always return your answer in the format: "DECODED: [result]" or "NO VALID ENCODING DETECTED"
